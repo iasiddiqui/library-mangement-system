@@ -34,23 +34,30 @@ function waitForDb(ms = 12000) {
 }
 
 const handler = (req, res) => {
-  if (!req.path.startsWith('/api/')) return app(req, res);
-  if (isMissingMongoUri) {
-    return res.status(503).json({
-      success: false,
-      message: 'MONGODB_URI not configured. Add it in Vercel Project Settings → Environment Variables.'
-    });
-  }
-  waitForDb()
-    .then(() => app(req, res))
-    .catch((err) => {
-      console.error('DB not ready:', err.message);
-      res.status(503).json({
+  try {
+    const path = (req.url || '').split('?')[0];
+    if (!path.startsWith('/api/')) return app(req, res);
+    if (isMissingMongoUri) {
+      return res.status(503).json({
         success: false,
-        message: 'Database connecting. Please try again in a few seconds.',
-        detail: process.env.VERCEL ? undefined : err.message
+        message: 'MONGODB_URI not configured. Add it in Vercel Project Settings → Environment Variables.'
       });
-    });
+    }
+    waitForDb()
+      .then(() => app(req, res))
+      .catch((err) => {
+        console.error('DB not ready:', err.message);
+        res.status(503).json({
+          success: false,
+          message: 'Database connecting. Please try again in a few seconds.',
+          detail: process.env.VERCEL ? undefined : err.message
+        });
+      });
+  } catch (err) {
+    console.error('Handler error:', err);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
 };
 
+handler.config = { maxDuration: 30 };
 module.exports = handler;
