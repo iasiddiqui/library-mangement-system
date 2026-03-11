@@ -6,10 +6,10 @@ const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/librar
 
 const isMissingMongoUri = process.env.VERCEL && (!process.env.MONGODB_URI || MONGODB_URI.includes('localhost'));
 
-// Connect to MongoDB (skip if URI not set on Vercel)
-mongoose.connect(MONGODB_URI, {
-  serverSelectionTimeoutMS: 15000,
-  connectTimeoutMS: 15000,
+// Connect to MongoDB - cache promise for serverless
+const connectPromise = mongoose.connect(MONGODB_URI, {
+  serverSelectionTimeoutMS: 20000,
+  connectTimeoutMS: 20000,
 }).then(async () => {
   console.log('MongoDB connected (Vercel)');
   try {
@@ -21,16 +21,18 @@ mongoose.connect(MONGODB_URI, {
     await Book.initDefaultBooks();
     await Book.updateBooksContent();
   } catch (e) { console.error('Init books:', e.message); }
-}).catch(err => console.error('MongoDB connection error:', err));
+}).catch(err => {
+  console.error('MongoDB connection error:', err);
+  throw err;
+});
 
-// Wait for DB before handling API requests (handles cold start); skip wait if URI missing
-function waitForDb(ms = 12000) {
-  return new Promise((resolve, reject) => {
-    if (mongoose.connection.readyState === 1) return resolve();
-    const t = setTimeout(() => reject(new Error('Database connection timeout')), ms);
-    mongoose.connection.once('connected', () => { clearTimeout(t); resolve(); });
-    mongoose.connection.once('error', (err) => { clearTimeout(t); reject(err); });
-  });
+// Wait for DB before handling API (handles cold start)
+async function waitForDb(ms = 25000) {
+  if (mongoose.connection.readyState === 1) return;
+  await Promise.race([
+    connectPromise,
+    new Promise((_, rej) => setTimeout(() => rej(new Error('Database connection timeout')), ms))
+  ]);
 }
 
 const handler = (req, res) => {
@@ -49,7 +51,7 @@ const handler = (req, res) => {
         console.error('DB not ready:', err.message);
         res.status(503).json({
           success: false,
-          message: 'Database connecting. Please try again in a few seconds.',
+          message: 'Database connecting. Please try again in a few seconds. If this persists, check MONGODB_URI in Vercel env vars and MongoDB Atlas Network Access (allow 0.0.0.0/0).',
           detail: process.env.VERCEL ? undefined : err.message
         });
       });
