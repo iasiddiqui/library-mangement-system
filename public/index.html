@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Home | Online Library</title>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <h1>ONLINE LIBRARY MANAGEMENT SYSTEM</h1>
+    <nav>
+      <span id="usernameDisplay" class="username-display" style="display: none;"></span>
+      <ul>
+        <li><a href="index.html">HOME</a></li>
+        <li><a href="books.html">BOOKS</a></li>
+        <li id="studentLoginLink"><a href="student_login.html">STUDENT LOGIN</a></li>
+        <li id="registerLink"><a href="registration.html">REGISTRATION</a></li>
+        <li><a href="feedback.html">FEEDBACK</a></li>
+        <li id="adminLink"><a href="admin_login.html">ADMIN LOGIN</a></li>
+        <li id="logoutLink" style="display: none;"><a href="javascript:void(0)" onclick="logout(); return false;">LOGOUT</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <div class="login-box">
+    <h2>WELCOME TO ONLINE LIBRARY</h2>
+    <h4>Manage books, users, and feedback efficiently.</h4>
+    <h4>Fast access, accurate records, and a user-friendly interface.</h4>
+    <h4>Start exploring the library today!</h4>
+  </div>
+
+  <footer>
+    <p>Email: moneeriqbal19@gmail.com</p>
+    <p>Mobile: +91 74850 88439</p>
+  </footer>
+
+  <script>
+    const token = localStorage.getItem('token');
+    const adminToken = localStorage.getItem('adminToken');
+    const username = localStorage.getItem('username');
+    const userRole = localStorage.getItem('userRole');
+
+    // Hide login/register/admin buttons if logged in
+    if (token || adminToken) {
+      if (document.getElementById('studentLoginLink')) {
+        document.getElementById('studentLoginLink').style.display = 'none';
+      }
+      if (document.getElementById('registerLink')) {
+        document.getElementById('registerLink').style.display = 'none';
+      }
+      if (document.getElementById('adminLink')) {
+        document.getElementById('adminLink').style.display = 'none';
+      }
+      if (document.getElementById('logoutLink')) {
+        document.getElementById('logoutLink').style.display = 'block';
+      }
+      if (username && document.getElementById('usernameDisplay')) {
+        document.getElementById('usernameDisplay').textContent = username;
+        document.getElementById('usernameDisplay').style.display = 'flex';
+      }
+    }
+
+    function logout() {
+      localStorage.removeItem('token');
+      localStorage.removeItem('adminToken');
+      localStorage.removeItem('user');
+      localStorage.removeItem('admin');
+      localStorage.removeItem('username');
+      localStorage.removeItem('userRole');
+      window.location.href = 'index.html';
+    }
+  </script>
+</body>
+</html>

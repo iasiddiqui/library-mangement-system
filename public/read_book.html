@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Read Book | Online Library</title>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    .reading-container {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 40px 20px;
+    }
+    .reading-header {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+    .reading-header h2 {
+      color: #ffd700;
+      font-size: 28px;
+      margin-bottom: 10px;
+    }
+    .reading-header p {
+      color: #fdf6e3;
+      opacity: 0.8;
+    }
+    .book-content {
+      background: rgba(255, 255, 255, 0.12);
+      backdrop-filter: blur(12px);
+      border-radius: 20px;
+      padding: 40px;
+      box-shadow: 0 8px 25px rgba(0,0,0,0.5);
+      color: #fdf6e3;
+      line-height: 1.8;
+      font-size: 16px;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+    .book-content h1 {
+      color: #ffd700;
+      font-size: 32px;
+      margin-bottom: 20px;
+      border-bottom: 2px solid rgba(255, 215, 0, 0.3);
+      padding-bottom: 10px;
+    }
+    .book-content h2 {
+      color: #ffd700;
+      font-size: 24px;
+      margin-top: 30px;
+      margin-bottom: 15px;
+    }
+    .book-content h3 {
+      color: #ffd700;
+      font-size: 20px;
+      margin-top: 20px;
+      margin-bottom: 10px;
+    }
+    .book-content strong {
+      color: #ffd700;
+    }
+    .book-content code {
+      background: rgba(0, 0, 0, 0.3);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: 'Courier New', monospace;
+    }
+    .reading-actions {
+      text-align: center;
+      margin-top: 30px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1 id="headerTitle">📚 Library Dashboard</h1>
+    <nav>
+      <span id="usernameDisplay" class="username-display" style="display: none;"></span>
+      <ul id="navLinks">
+        <li><a href="dashboard.html">DASHBOARD</a></li>
+        <li><a href="books.html">BOOKS</a></li>
+        <li><a href="feedback.html">FEEDBACK</a></li>
+        <li><a href="javascript:void(0)" onclick="logout(); return false;">LOGOUT</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <div class="container">
+    <div class="reading-container">
+      <div class="reading-header">
+        <h2 id="bookTitle">Loading...</h2>
+        <p id="bookAuthor"></p>
+      </div>
+      <div id="bookContent" class="book-content">
+        <p style="color: #fff; text-align: center;">Loading book content...</p>
+      </div>
+      <div class="reading-actions">
+        <button class="btn btn-default" onclick="window.history.back()">Back</button>
+        <button class="btn btn-primary" onclick="window.location.href='books.html'">Browse More Books</button>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <p>Email: moneeriqbal19@gmail.com</p>
+    <p>Mobile: +91 74850 88439</p>
+  </footer>
+
+  <script>
+    const token = localStorage.getItem('token');
+    const adminToken = localStorage.getItem('adminToken');
+    let userRole = localStorage.getItem('userRole');
+    
+    // Determine role if not set
+    if (!userRole) {
+      if (adminToken) {
+        userRole = 'admin';
+        localStorage.setItem('userRole', 'admin');
+      } else if (token) {
+        userRole = 'student';
+        localStorage.setItem('userRole', 'student');
+      }
+    }
+    
+    // Allow both students and admins to read books, but redirect if not logged in
+    if (!token && !adminToken) {
+      if (userRole === 'admin') {
+        window.location.href = 'admin_login.html';
+      } else {
+        window.location.href = 'student_login.html';
+      }
+    }
+    
+    // Display username and update navbar based on role
+    const username = localStorage.getItem('username');
+    if (username) {
+      document.getElementById('usernameDisplay').textContent = username;
+    }
+    
+    // Update navbar based on role
+    if (userRole === 'admin') {
+      document.getElementById('headerTitle').textContent = '📚 Admin Dashboard';
+      const navLinks = document.getElementById('navLinks');
+      navLinks.innerHTML = `
+        <li><a href="admin_dashboard.html">ADMIN</a></li>
+        <li><a href="books.html">BOOKS</a></li>
+        <li><a href="feedback.html">FEEDBACK</a></li>
+        <li><a href="javascript:void(0)" onclick="logout(); return false;">LOGOUT</a></li>
+      `;
+    } else if (userRole === 'student') {
+      document.getElementById('headerTitle').textContent = '📚 Student Dashboard';
+      const navLinks = document.getElementById('navLinks');
+      navLinks.innerHTML = `
+        <li><a href="dashboard.html">DASHBOARD</a></li>
+        <li><a href="books.html">BOOKS</a></li>
+        <li><a href="profile.html">PROFILE</a></li>
+        <li><a href="issued_books.html">MY BOOKS</a></li>
+        <li><a href="feedback.html">FEEDBACK</a></li>
+        <li><a href="javascript:void(0)" onclick="logout(); return false;">LOGOUT</a></li>
+      `;
+    }
+
+    // Get book ID from URL
+    const urlParams = new URLSearchParams(window.location.search);
+    let bookId = urlParams.get('id');
+
+    async function loadBookContent() {
+      try {
+        // Re-check bookId in case it wasn't set
+        if (!bookId) {
+          const urlParams = new URLSearchParams(window.location.search);
+          bookId = urlParams.get('id');
+        }
+        
+        if (!bookId) {
+          document.getElementById('bookContent').innerHTML = 
+            '<p style="color: #fff; text-align: center;">No book ID provided. Please select a book.</p>';
+          return;
+        }
+
+        console.log('Loading book with ID:', bookId);
+        const response = await fetch(`/api/books/${bookId}`);
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        console.log('Book data received:', data);
+        
+        if (data.success && data.book) {
+          const book = data.book;
+          
+          document.getElementById('bookTitle').textContent = book.title;
+          if (book.author) {
+            document.getElementById('bookAuthor').textContent = `By ${book.author}`;
+          } else {
+            document.getElementById('bookAuthor').textContent = '';
+          }
+          
+          const contentDiv = document.getElementById('bookContent');
+          
+          if (book.content && book.content.trim() !== '') {
+            // Convert markdown-like content to HTML
+            let content = book.content;
+            // Convert markdown headers (must be done in order)
+            content = content.replace(/^### (.*$)/gim, '<h3>$1</h3>');
+            content = content.replace(/^## (.*$)/gim, '<h2>$1</h2>');
+            content = content.replace(/^# (.*$)/gim, '<h1>$1</h1>');
+            // Convert bold
+            content = content.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            // Convert code blocks
+            content = content.replace(/`(.*?)`/g, '<code>$1</code>');
+            // Convert double line breaks to paragraphs
+            content = content.split(/\n\n+/).map(para => {
+              if (para.trim()) {
+                // Convert single line breaks within paragraphs to <br>
+                para = para.replace(/\n/g, '<br>');
+                return '<p>' + para.trim() + '</p>';
+              }
+              return '';
+            }).join('');
+            
+            contentDiv.innerHTML = content;
+          } else {
+            contentDiv.innerHTML = `
+              <p style="text-align: center; color: #fdf6e3;">
+                Content for this book is being prepared. Please check back soon!
+              </p>
+              <p style="margin-top: 20px; text-align: center;">
+                This is a great book in the ${book.category || 'General'} category. 
+                Explore the content and enhance your knowledge.
+              </p>
+            `;
+          }
+        } else {
+          console.error('Book not found or invalid response:', data);
+          document.getElementById('bookContent').innerHTML = 
+            '<p style="color: #fff; text-align: center;">Book not found. Please try selecting another book.</p>';
+        }
+      } catch (error) {
+        console.error('Error loading book:', error);
+        document.getElementById('bookContent').innerHTML = 
+          `<p style="color: #fff; text-align: center;">Error loading book: ${error.message}. Please try again.</p>`;
+      }
+    }
+
+    function logout() {
+      localStorage.removeItem('token');
+      localStorage.removeItem('adminToken');
+      localStorage.removeItem('user');
+      localStorage.removeItem('admin');
+      localStorage.removeItem('username');
+      localStorage.removeItem('userRole');
+      window.location.href = 'index.html';
+    }
+
+    if (!bookId) {
+      document.getElementById('bookContent').innerHTML = 
+        '<p style="color: #fff; text-align: center;">No book ID provided. Please select a book from the books page.</p>';
+      document.getElementById('bookTitle').textContent = 'Book Not Found';
+    } else {
+      loadBookContent();
+    }
+  </script>
+</body>
+</html>
+

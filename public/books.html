@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Books | Online Library</title>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <h1>📚 Online Library</h1>
+    <nav>
+      <span id="usernameDisplay" class="username-display" style="display: none;"></span>
+      <ul>
+        <li><a href="index.html">HOME</a></li>
+        <li><a href="books.html">BOOKS</a></li>
+        <li id="loginLink"><a href="student_login.html">LOGIN</a></li>
+        <li id="registerLink"><a href="registration.html">REGISTER</a></li>
+        <li><a href="feedback.html">FEEDBACK</a></li>
+        <li id="adminLink"><a href="admin_login.html">ADMIN</a></li>
+        <li id="logoutLink" style="display: none;"><a href="javascript:void(0)" onclick="logout(); return false;">LOGOUT</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <div class="books-section">
+    <div class="search-container">
+      <input type="text" id="searchInput" class="form-control" placeholder="🔍 Search books by title, author, or category..." style="max-width: 500px; margin: 0 auto 30px;">
+      <select id="categoryFilter" class="form-control" style="max-width: 200px; margin: 0 auto 30px;">
+        <option value="">All Categories</option>
+        <option value="Science">Science</option>
+        <option value="Language">Language</option>
+        <option value="Business">Business</option>
+        <option value="History">History</option>
+        <option value="Programming">Programming</option>
+      </select>
+    </div>
+    <div id="booksContainer">
+      <p style="color: #fff; text-align: center;">Loading books...</p>
+    </div>
+  </div>
+
+  <footer>
+    <p>Email: moneeriqbal19@gmail.com</p>
+    <p>Mobile: +91 74850 88439</p>
+  </footer>
+
+  <script>
+    const token = localStorage.getItem('token');
+    const adminToken = localStorage.getItem('adminToken');
+    const username = localStorage.getItem('username');
+    let userRole = localStorage.getItem('userRole');
+    
+    // Determine role if not set
+    if (!userRole) {
+      if (adminToken) {
+        userRole = 'admin';
+        localStorage.setItem('userRole', 'admin');
+      } else if (token) {
+        userRole = 'student';
+        localStorage.setItem('userRole', 'student');
+      }
+    }
+
+    // Show username if logged in and update navbar
+    if (username) {
+      document.getElementById('usernameDisplay').textContent = username;
+      document.getElementById('usernameDisplay').style.display = 'flex';
+      if (userRole === 'student') {
+        document.getElementById('loginLink').style.display = 'none';
+        document.getElementById('registerLink').style.display = 'none';
+        document.getElementById('adminLink').style.display = 'none';
+        document.getElementById('logoutLink').style.display = 'block';
+        // Add dashboard link for students
+        const nav = document.querySelector('nav ul');
+        if (!document.getElementById('studentDashboardLink')) {
+          const dashboardLi = document.createElement('li');
+          dashboardLi.id = 'studentDashboardLink';
+          dashboardLi.innerHTML = '<a href="dashboard.html">DASHBOARD</a>';
+          nav.insertBefore(dashboardLi, nav.firstChild);
+        }
+      } else if (userRole === 'admin') {
+        document.getElementById('loginLink').style.display = 'none';
+        document.getElementById('registerLink').style.display = 'none';
+        document.getElementById('adminLink').style.display = 'none';
+        document.getElementById('logoutLink').style.display = 'block';
+        // Add admin dashboard link
+        const nav = document.querySelector('nav ul');
+        if (!document.getElementById('adminDashboardLink')) {
+          const dashboardLi = document.createElement('li');
+          dashboardLi.id = 'adminDashboardLink';
+          dashboardLi.innerHTML = '<a href="admin_dashboard.html">ADMIN</a>';
+          nav.insertBefore(dashboardLi, nav.firstChild);
+        }
+      }
+    }
+
+    function logout() {
+      localStorage.removeItem('token');
+      localStorage.removeItem('adminToken');
+      localStorage.removeItem('user');
+      localStorage.removeItem('admin');
+      localStorage.removeItem('username');
+      localStorage.removeItem('userRole');
+      window.location.href = 'index.html';
+    }
+    let allBooks = [];
+
+    async function loadBooks(search = '', category = '') {
+      try {
+        // Initialize books if they don't exist (fallback, books are also initialized on server startup)
+        try {
+          await fetch('/api/books/init', { method: 'POST' });
+        } catch (initError) {
+          console.warn('Init call failed, continuing...', initError);
+        }
+        
+        let url = '/api/books';
+        const params = new URLSearchParams();
+        if (search) params.append('search', search);
+        if (category) params.append('category', category);
+        if (params.toString()) url += '?' + params.toString();
+        
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        const container = document.getElementById('booksContainer');
+        
+        if (!response.ok || !data.success) {
+          const msg = data.message || 'Failed to load books. Please refresh or check if the server is connected.';
+          container.innerHTML = `<p style="color: #e74c3c; text-align: center;">${msg}</p>`;
+          return;
+        }
+        
+        if (data.books && data.books.length > 0) {
+          allBooks = data.books;
+          container.innerHTML = data.books.map(book => {
+            // Ensure image URL uses the correct path
+            let imageUrl = book.imageUrl || '/images/books/default-book.jpg';
+            // Fix old paths if they exist
+            if (imageUrl.startsWith('/images/') && !imageUrl.startsWith('/images/books/')) {
+              const filename = imageUrl.split('/').pop();
+              imageUrl = `/images/books/${filename}`;
+            }
+            return `
+            <div class="book-card">
+              <img src="${imageUrl}" alt="${book.title}" onerror="console.error('Image failed to load:', this.src); this.style.display='none';">
+              <h4>${book.title}</h4>
+              ${book.category ? `<p class="book-category">${book.category}</p>` : ''}
+              ${book.isAvailable ? 
+                (token && userRole === 'student' ? `<button class="read-btn" onclick="issueBook('${book._id}')">Issue Book</button>` : 
+                token && userRole === 'admin' ? '' :
+                `<button class="read-btn" onclick="window.location.href='read_book.html?id=${book._id}'">Read Now</button>`) : 
+                `<button class="read-btn" style="background: #95a5a6; cursor: not-allowed;" disabled>Not Available</button>`
+              }
+              ${token && userRole === 'student' ? `<button class="read-btn" onclick="window.location.href='read_book.html?id=${book._id}'" style="margin-top: 5px; background: #2ecc71;">Read Book</button>` : 
+                token && userRole === 'admin' ? `<button class="read-btn" onclick="window.location.href='read_book.html?id=${book._id}'" style="margin-top: 5px; background: #2ecc71;">View Book</button>` : ''}
+            </div>
+          `;
+          }).join('');
+        } else {
+          container.innerHTML = '<p style="color: #fff; text-align: center;">No books found. Try a different search.</p>';
+        }
+      } catch (error) {
+        console.error('Error loading books:', error);
+        document.getElementById('booksContainer').innerHTML = 
+          '<p style="color: #fff; text-align: center;">Error loading books. Please try again.</p>';
+      }
+    }
+
+    async function issueBook(bookId) {
+      if (!token) {
+        alert('Please login to issue books');
+        window.location.href = 'student_login.html';
+        return;
+      }
+
+      if (!confirm('Are you sure you want to issue this book?')) {
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/issues/${bookId}`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'x-auth-token': token
+          }
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          alert('Book issued successfully!');
+          loadBooks(document.getElementById('searchInput').value, document.getElementById('categoryFilter').value);
+        } else {
+          alert(data.message || 'Failed to issue book');
+        }
+      } catch (error) {
+        console.error('Error issuing book:', error);
+        alert('An error occurred. Please try again.');
+      }
+    }
+
+    // Search functionality
+    document.getElementById('searchInput').addEventListener('input', (e) => {
+      const search = e.target.value;
+      const category = document.getElementById('categoryFilter').value;
+      loadBooks(search, category);
+    });
+
+    document.getElementById('categoryFilter').addEventListener('change', (e) => {
+      const category = e.target.value;
+      const search = document.getElementById('searchInput').value;
+      loadBooks(search, category);
+    });
+
+    // Load books when page loads
+    loadBooks();
+  </script>
+</body>
+</html>
+
