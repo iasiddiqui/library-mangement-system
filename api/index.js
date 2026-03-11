@@ -4,10 +4,12 @@ const app = require('../app');
 
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/library_management';
 
-// Connect to MongoDB (fire-and-forget; Mongoose buffers ops until connected)
+const isMissingMongoUri = process.env.VERCEL && (!process.env.MONGODB_URI || MONGODB_URI.includes('localhost'));
+
+// Connect to MongoDB (skip if URI not set on Vercel)
 mongoose.connect(MONGODB_URI, {
-  serverSelectionTimeoutMS: 10000,
-  connectTimeoutMS: 10000,
+  serverSelectionTimeoutMS: 15000,
+  connectTimeoutMS: 15000,
 }).then(async () => {
   console.log('MongoDB connected (Vercel)');
   try {
@@ -21,4 +23,34 @@ mongoose.connect(MONGODB_URI, {
   } catch (e) { console.error('Init books:', e.message); }
 }).catch(err => console.error('MongoDB connection error:', err));
 
-module.exports = app;
+// Wait for DB before handling API requests (handles cold start); skip wait if URI missing
+function waitForDb(ms = 12000) {
+  return new Promise((resolve, reject) => {
+    if (mongoose.connection.readyState === 1) return resolve();
+    const t = setTimeout(() => reject(new Error('Database connection timeout')), ms);
+    mongoose.connection.once('connected', () => { clearTimeout(t); resolve(); });
+    mongoose.connection.once('error', (err) => { clearTimeout(t); reject(err); });
+  });
+}
+
+const handler = (req, res) => {
+  if (!req.path.startsWith('/api/')) return app(req, res);
+  if (isMissingMongoUri) {
+    return res.status(503).json({
+      success: false,
+      message: 'MONGODB_URI not configured. Add it in Vercel Project Settings → Environment Variables.'
+    });
+  }
+  waitForDb()
+    .then(() => app(req, res))
+    .catch((err) => {
+      console.error('DB not ready:', err.message);
+      res.status(503).json({
+        success: false,
+        message: 'Database connecting. Please try again in a few seconds.',
+        detail: process.env.VERCEL ? undefined : err.message
+      });
+    });
+};
+
+module.exports = handler;
